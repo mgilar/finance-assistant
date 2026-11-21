@@ -301,6 +301,12 @@ def tool_definitions() -> list[dict[str, Any]]:
             for name, (model, desc) in TOOL_SPECS.items()]
 
 
+def failed_outcome(name: str, raw_args: dict[str, Any], message: str) -> ToolOutcome:
+    """A failed call stays in the lineage (§8.2 covers failures too)."""
+    evidence = ToolCallEvidence(tool=name, args=raw_args, ok=False, error=message)
+    return ToolOutcome({"error": message}, evidence)
+
+
 def execute_tool(name: str, raw_args: dict[str, Any], ds: Dataset, policy: Policy) -> ToolOutcome:
     """Run a tool. Raises ToolError (with a model-readable message) on any failure."""
     if name not in TOOL_SPECS:

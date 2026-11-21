@@ -78,10 +78,14 @@ class AskResponse(BaseModel):
     sources_used: list[Literal["data", "policy"]]
     policy_citations: list[PolicyCitation]
     data_evidence: list[ToolCallEvidence]
+    routing_reason: str          # why data / policy / both were used (agentic routing)
     caveats: list[str]           # assumptions applied (FX, net of credit notes, status snapshot)
     gaps: list[str]              # what the data cannot verify
+    unverified_figures: list[str]  # numbers in the answer not found in any evidence
     mode: Literal["llm", "stub"]
-    model: str | None = None
+    model: str | None = None     # the model that actually answered (None in stub mode)
+    policy_version: str
+    data_sources: list[str]
 
 
 # ---------- errors ----------

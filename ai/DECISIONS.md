@@ -163,3 +163,32 @@ and `approval_requirement(amount, currency)` handles thresholds.
 
 **Spotted in testing:** the #2 vendor by spend (PharmaPrint, about EUR 1.09M) is INACTIVE, so answers
 should surface vendor status (§4.1). That goes into the system prompt.
+
+## 8. The `/ask` pipeline
+
+**I asked** for a provider-agnostic design (Anthropic or OpenAI key). **AI challenged:** a second
+adapter costs about an hour and couldn't be tested without an OpenAI key; it also argued against a wrapper
+library like LiteLLM, which hides the provider differences. **I decided:** Anthropic only for the time box,
+noted as a production item. The post-processing is already provider-neutral, so only `llm.py` would change.
+
+**I decided:**
+- **Model: Claude Sonnet 5.5** by default (`ANTHROPIC_MODEL` to override). About half the cost of Opus,
+  and strong at tool use, which is what this workload is.
+- **Key in `backend/.env`**, not pasted in the UI, so the secret never passes through the browser.
+- **Final answer as structured output** (a JSON schema enforced by the API). Forcing a "submit answer"
+  tool isn't possible on current models, and parsing prose is fragile.
+- **Number check: flag and downgrade.** Every figure in the answer must match a tool result, the cited
+  policy text, or the question (within 0.5%, so "EUR 1.13M" matches 1,132,677.97). A mismatch is
+  shown as an unverified figure and the status becomes `partial`. Blocking the answer would hide good
+  answers on formatting false positives.
+- **Stub = keyword router over the real tools**, so evidence and verification work end to end without a key.
+
+**How it fits together:** `llm.py` (Claude loop) and `stub.py` both return the same raw answer.
+`ask.py` post-processes it the same way for both: validate citations (unknown IDs are dropped and
+flagged), run the number check, derive `sources_used` from the tools that actually ran (not from what the
+model claims), and gather caveats from the tools. The model's `routing_reason` is shown to the user
+(agentic routing), but the facts win. Failed tools go back to the model as `is_error`; the loop
+is capped at 5 rounds; an LLM failure returns 503 with no fallback to the stub.
+
+**Tests use a scripted fake Claude client**, so the loop, the error paths and the checks are tested
+without an API key.

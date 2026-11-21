@@ -10,17 +10,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from dotenv import load_dotenv
+
+from app.ask import answer_question
 from app.data import load_dataset
-from app.schemas import ErrorCode, ErrorDetail, ErrorResponse, SummaryResponse
+from app.llm import LLMUnavailable, llm_configured
+from app.policy import load_policy
+from app.schemas import AskRequest, AskResponse, ErrorCode, ErrorDetail, ErrorResponse, SummaryResponse
 from app.summary import build_summary
 
+load_dotenv()  # backend/.env (git-ignored) holds ANTHROPIC_API_KEY
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("finance_assistant")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Fail fast: if the data doesn't validate, the app doesn't start.
+    # Fail fast: if the data or the policy doesn't validate, the app doesn't start.
     app.state.dataset = load_dataset()
+    app.state.policy = load_policy()
+    logger.info("Answering mode: %s", "llm" if llm_configured() else "STUB (no ANTHROPIC_API_KEY)")
     yield
 
 
@@ -71,6 +80,12 @@ async def on_http_error(request: Request, exc: StarletteHTTPException):
     return error_response(request, exc.status_code, code, str(exc.detail), retryable=False)
 
 
+@app.exception_handler(LLMUnavailable)
+async def on_llm_unavailable(request: Request, exc: LLMUnavailable):
+    # A system failure: 503, and no silent fallback to the stub.
+    return error_response(request, 503, "llm_unavailable", str(exc), retryable=exc.retryable)
+
+
 @app.exception_handler(Exception)
 async def on_unexpected_error(request: Request, exc: Exception):
     logger.exception("Unhandled error [%s]", _request_id(request))
@@ -82,3 +97,10 @@ async def on_unexpected_error(request: Request, exc: Exception):
 @app.get("/summary", response_model=SummaryResponse)
 def get_summary(request: Request) -> SummaryResponse:
     return build_summary(request.app.state.dataset, _request_id(request))
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask(body: AskRequest, request: Request) -> AskResponse:
+    # Sync def: FastAPI runs it in a thread pool, so the blocking LLM call doesn't stall the server.
+    return answer_question(body.question, request.app.state.dataset, request.app.state.policy,
+                           _request_id(request))

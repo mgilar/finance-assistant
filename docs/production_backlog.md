@@ -17,3 +17,5 @@ Items deliberately left out of the prototype. These feed the README "What produc
 ## Product
 - Summary panel data-quality flags: invoices missing a PO, missing an approver, from
   non-active vendors.
+- Provider-agnostic LLM layer: the post-processing (citations, number check, lineage) is
+  already provider-neutral; only `llm.py` would need a second adapter (e.g. OpenAI).
