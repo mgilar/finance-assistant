@@ -170,6 +170,53 @@ def test_llm_tool_loop_ends_with_forced_answer_from_gathered_evidence(fake_claud
     assert len(body["data_evidence"]) == llm.MAX_TOOL_ROUNDS
 
 
+def test_tool_loop_is_unconstrained_and_valid_json_draft_is_used_directly(fake_claude):
+    client, install = fake_claude
+    calls = install([
+        tool_turn(tool_use("t1", "approval_requirement", {"amount": 60000, "currency": "EUR"})),
+        final(answer="Finance Director.", policy_citation_ids=["3"]),
+    ])
+    body = ask(client, "Who approves EUR 60,000?").json()
+    assert len(calls) == 2                                        # no extra structuring call
+    assert all("format" not in c["output_config"] for c in calls)  # format never constrains the loop
+    assert body["status"] == "answered"
+
+
+def test_prose_draft_triggers_one_structuring_call(fake_claude):
+    client, install = fake_claude
+    prose = SimpleNamespace(stop_reason="end_turn", model="claude-sonnet-5-5",
+                            content=[SimpleNamespace(type="text", text="The Finance Director approves it.")])
+    calls = install([
+        tool_turn(tool_use("t1", "approval_requirement", {"amount": 60000, "currency": "EUR"})),
+        prose,
+        final(answer="The Finance Director approves it.", policy_citation_ids=["3"]),
+    ])
+    body = ask(client, "Who approves EUR 60,000?").json()
+    assert len(calls) == 3
+    assert calls[-1]["output_config"]["format"]["type"] == "json_schema"
+    assert calls[-1]["tool_choice"] == {"type": "none"}
+    assert body["answer"] == "The Finance Director approves it." and body["status"] == "answered"
+
+
+def test_json_inside_prose_draft_is_used_without_structuring_call(fake_claude):
+    client, install = fake_claude
+    payload = json.dumps({"status": "answered", "answer": "Finance Director.", "policy_citation_ids": ["3"],
+                          "gaps": [], "routing_reason": "r"})
+    draft = SimpleNamespace(stop_reason="end_turn", model="m", content=[SimpleNamespace(
+        type="text", text=f"Here is the ranking {{see §3}}.\n\n```json\n{payload}\n```")])
+    calls = install([tool_turn(tool_use("t1", "approval_requirement", {"amount": 60000})), draft])
+    body = ask(client, "Who approves EUR 60,000?").json()
+    assert len(calls) == 2 and body["answer"] == "Finance Director."
+
+
+def test_invalid_final_after_structuring_is_503(fake_claude):
+    client, install = fake_claude
+    bad = SimpleNamespace(stop_reason="end_turn", model="m", content=[SimpleNamespace(type="text", text="not json")])
+    install([bad, bad])
+    r = ask(client, "anything")
+    assert r.status_code == 503 and r.json()["error"]["code"] == "llm_unavailable"
+
+
 def test_system_prompt_has_explicit_cache_breakpoint(fake_claude):
     client, install = fake_claude
     calls = install([final(answer="ok", status="cannot_answer")])
