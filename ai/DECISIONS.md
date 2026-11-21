@@ -134,3 +134,13 @@ small pytest suite.
 can show "can't answer" neutrally; and separate `caveats` (assumptions applied) from `gaps`
 (what can't be verified). Open item for the `/ask` step: a post-answer number check (every
 number in the answer must appear in a tool result).
+
+Housekeeping: pinned Python 3.13 (`.python-version`), so reviewers run what was tested.
+
+## 6. Policy as citable units
+
+The policy (about 50 lines) goes fully into context, with no retrieval step. It's parsed into units with
+stable IDs: numbered clauses (`3.1`), plus section-level text such as the §3 threshold table (`3`).
+The prompt tags every unit `[§id]`; those are the only IDs the model may cite, and the backend
+attaches the verbatim text. The policy version (`FIN-POL-014 v3.2`) is part of the lineage, so an
+answer stays traceable to the policy version it used.
