@@ -146,8 +146,6 @@ run a weekly sampled audit.
 1. Build the eval set and scoring script described above, and run it on every prompt or model change.
 2. Persist the audit record per request (§8.2) and add analyst feedback on answers.
 3. Real ECB rates and vendor status history, to remove the two most common caveats.
-4. An approver role directory, to turn "can't verify authority" into an actual §3 / §7 check.
-5. Stream responses, and try routing simple lookups to a cheaper model, judged by the eval.
 
 ## How I used AI
 
