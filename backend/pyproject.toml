@@ -1,0 +1,18 @@
+[project]
+name = "finance-assistant"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.165.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
