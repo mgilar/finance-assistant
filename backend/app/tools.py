@@ -179,7 +179,8 @@ def aggregate_spend(ds: Dataset, args: AggregateSpendArgs) -> ToolOutcome:
     else:
         col = _GROUP_COLUMNS[args.group_by]
         keyed = df.assign(_key=df[col].fillna("(none)"))
-        groups = [{args.group_by: key, **_group_stats(g)} for key, g in keyed.groupby("_key")]
+        groups = [{args.group_by: key, **_vendor_context(args.group_by, g), **_group_stats(g)}
+                  for key, g in keyed.groupby("_key")]
         groups.sort(key=lambda g: g["eur_approx"], reverse=True)
         result = groups[: args.limit]
         shown = {g[args.group_by] for g in result}
@@ -199,6 +200,15 @@ def aggregate_spend(ds: Dataset, args: AggregateSpendArgs) -> ToolOutcome:
         result=result, rows=_rows(contributing.sort_values("amount_eur", ascending=False)),
     )
     return ToolOutcome(for_model, evidence, caveats=_common_caveats(df, args.filters, args.group_by))
+
+
+def _vendor_context(group_by: str, g: pd.DataFrame) -> dict[str, Any]:
+    """Vendor groups carry status and country, so the model never needs extra calls to find
+    out whether a vendor is ACTIVE (a live test showed it looping to get exactly this)."""
+    if group_by != "vendor":
+        return {}
+    first = g.iloc[0]
+    return {"vendor_status": first["vendor_status"], "vendor_country": first["vendor_country"]}
 
 
 def _group_stats(g: pd.DataFrame) -> dict[str, Any]:

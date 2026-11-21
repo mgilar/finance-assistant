@@ -157,9 +157,21 @@ def test_llm_failure_is_503_without_stub_fallback(fake_claude):
                                  "retryable": True}
 
 
-def test_llm_tool_loop_is_bounded(fake_claude):
+def test_llm_tool_loop_ends_with_forced_answer_from_gathered_evidence(fake_claude):
     client, install = fake_claude
-    loop = tool_turn(tool_use("t", "approval_requirement", {"amount": 1, "currency": "EUR"}))
-    install([loop] * (llm.MAX_TOOL_ROUNDS + 1))
+    loop = tool_turn(tool_use("t", "approval_requirement", {"amount": 60000, "currency": "EUR"}))
+    calls = install([loop] * llm.MAX_TOOL_ROUNDS
+                    + [final(answer="Finance Director.", policy_citation_ids=["3"])])
     body = ask(client, "loop forever").json()
-    assert body["status"] == "cannot_answer"
+    assert calls[-1]["tool_choice"] == {"type": "none"}          # last round: tools disabled
+    assert all(c["tool_choice"] == {"type": "auto"} for c in calls[:-1])
+    assert body["status"] == "partial"                            # downgraded, not discarded
+    assert any("Tool-call limit" in g for g in body["gaps"])
+    assert len(body["data_evidence"]) == llm.MAX_TOOL_ROUNDS
+
+
+def test_system_prompt_has_explicit_cache_breakpoint(fake_claude):
+    client, install = fake_claude
+    calls = install([final(answer="ok", status="cannot_answer")])
+    ask(client, "hello")
+    assert calls[0]["system"][0]["cache_control"] == {"type": "ephemeral"}

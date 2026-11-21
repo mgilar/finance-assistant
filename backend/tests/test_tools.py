@@ -55,6 +55,8 @@ def test_top_5_vendors_evidence_is_contributing_rows(ds, policy, raw):
     assert {r["vendor_name"] for r in out.evidence.rows} == shown
     assert out.evidence.rows_scanned == 140
     assert len(out.evidence.rows) == sum(g["invoice_count"] for g in top)
+    # Vendor groups carry status, so the model needn't query it separately.
+    assert {g["vendor"]: g["vendor_status"] for g in top}["PharmaPrint Studios"] == "INACTIVE"
 
 
 def test_find_invoices_caps_model_view_not_evidence(ds, policy):

@@ -199,3 +199,23 @@ units stored with their version. The tagged policy text is static across request
 a natural candidate for prompt caching. The prototype already parses once at startup, returns
 `policy_version` with every answer, and sends the static system prompt + tools with `cache_control`
 (above Sonnet 5.5's 512-token minimum, with cache reads at 0.05× the input price).
+
+## 9. Testing against the real API
+
+**AI proposed** one live check before building the frontend, because the fake client proves the loop
+logic, not that the real API accepts the request. I added a key and we ran five fixed questions
+(details in [`docs/live_findings.md`](../docs/live_findings.md)).
+
+**It found two bugs the unit tests couldn't:**
+- **Tool-loop exhaustion.** My prompt asked the model to flag non-ACTIVE vendors, but the tool didn't
+  return vendor status, so the model kept querying. **I decided** to fix the root cause (results carry
+  status), add an efficiency instruction, and degrade gracefully: the last round disables tools so the
+  evidence already gathered becomes a `partial` answer instead of being discarded.
+- **Caching didn't work across questions.** Fixed with an explicit breakpoint on the static system prompt.
+
+**I decided** to measure rather than guess on effort: low vs medium, 2 runs × 5 questions. There was
+no difference in tool calls, latency or cost, so I kept `medium`.
+
+**Accepted and documented** (not fixed): the model sometimes repeats an identical query, and the same
+question can flip between `answered` and `partial`. Both become eval metrics (tool calls per answer,
+status consistency across runs).
