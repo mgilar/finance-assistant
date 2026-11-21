@@ -148,6 +148,18 @@ def test_llm_invented_figure_and_fake_citation_downgrade_to_partial(fake_claude)
     assert any("12.9" in g for g in body["gaps"])
 
 
+def test_model_gap_note_does_not_downgrade_a_verified_answer(fake_claude):
+    client, install = fake_claude
+    install([
+        tool_turn(tool_use("t1", "approval_requirement", {"amount": 60000, "currency": "EUR"})),
+        final(answer="The Finance Director.", policy_citation_ids=["3"],
+              gaps=["No approver roles in the data."]),
+    ])
+    body = ask(client, "Who approves EUR 60,000?").json()
+    assert body["status"] == "answered"                # model's status stands
+    assert body["gaps"] == ["No approver roles in the data."]  # but the note is still shown
+
+
 def test_llm_failure_is_503_without_stub_fallback(fake_claude):
     client, install = fake_claude
     install([anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com"))])

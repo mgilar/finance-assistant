@@ -56,7 +56,9 @@ def postprocess(raw: RawAnswer, mode: str, question: str, ds: Dataset, policy: P
     if unverified:
         gaps.append(f"These figures could not be matched to the evidence: {', '.join(unverified)}.")
 
-    if status == "answered" and (unknown_ids or unverified or raw.gaps):
+    # The model's own status stands; the backend downgrades only on facts it verified itself.
+    # (Model-listed gaps are still shown, but a context note shouldn't turn a correct answer amber.)
+    if status == "answered" and (unknown_ids or unverified):
         status = "partial"
 
     # 3. Routing transparency from facts.

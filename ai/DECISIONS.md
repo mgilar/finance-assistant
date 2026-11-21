@@ -216,9 +216,18 @@ logic, not that the real API accepts the request. I added a key and we ran five 
 **I decided** to measure rather than guess on effort: low vs medium, 2 runs × 5 questions. There was
 no difference in tool calls, latency or cost, so I kept `medium`.
 
-**Accepted and documented** (not fixed): the model sometimes repeats an identical query, and the same
-question can flip between `answered` and `partial`. Both become eval metrics (tool calls per answer,
-status consistency across runs).
+**At first I accepted** two behaviours as model quirks: repeated identical queries, and the same question
+flipping between `answered` and `partial`.
+
+**Then, reviewing the UI, I asked why it would repeat a call when one would do.** We investigated
+instead of labelling it: summarized thinking showed no reasoning behind the repeats, and an A/B
+proved the cause was our own design. The JSON-format constraint on every turn made the model stall
+with filler tool calls (2.67 vs 1.00 calls per question). **I decided** on "draft, then structure":
+an unconstrained tool loop, then schema validation of the final answer, with a format-enforced call
+only when the draft has no valid JSON. Re-measuring caught a bug in my first version (JSON inside prose
+was rejected, which *raised* cost) and showed standing caveats being listed as gaps. **I decided** to fix
+the prompt, and that the model's own status stands: the backend downgrades only on what it verified
+itself. Result: 1 tool call per question, 5.0 s average (from 6.3 s), and the same status across runs.
 
 ## 10. Frontend
 

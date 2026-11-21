@@ -31,13 +31,32 @@ confirmed; cost for the 5 questions fell from $0.131 to $0.075.
 
 No measurable difference, so I **kept `medium`** (configurable with `ANTHROPIC_EFFORT`).
 
-## Known behaviours, accepted and documented
+## Repeated tool calls: root cause found and fixed
 
-- **Repeated identical tool calls.** The model sometimes re-runs the same query to double-check
-  (e.g. "top 5" two or three times, about +3 s). Effort level didn't change this. Answers are
-  correct and the cost is about $0.01 per question, so I accepted it; "tool calls per answer"
-  is an eval and cost metric.
-- **Status inconsistency.** The same question can come back `answered` or `partial` across
-  runs with the same substance, because the model occasionally lists a caveat (the status
-  snapshot) or an irrelevant limitation as a gap. Accepted for the prototype; **status consistency
-  across repeated runs** is an eval metric, and a prompt fix is the first thing to try.
+At first I accepted the repeats as the model "double-checking". While reviewing the UI I asked
+why it would repeat a call when one would do, so we investigated:
+
+1. **Summarized thinking showed no reasoning at all**, so there was no hidden "let me verify".
+2. **A/B on "top 5", 3 runs each:** with the JSON-format constraint on every turn, **2.67** tool calls
+   per run (one run even called `approval_requirement(amount=1)`); without it, **1.00** every time.
+   Cause: when every text output must be the final JSON, the model can only commit immediately or
+   make another tool call, so it sometimes stalls with filler calls.
+3. **Fix ("draft, then structure"):** the tool loop runs unconstrained; the final answer is validated
+   against a schema (Pydantic), and only if the draft has no valid JSON does one extra call with
+   the format enforced structure it. The first version had a bug: it rejected JSON wrapped in prose,
+   which caused an extra call every time and *raised* cost and latency, caught by re-measuring.
+4. The re-measurement also showed the model now listed the status-snapshot caveat as a gap almost
+   every time (all answers amber). **Prompt fix:** standing assumptions are shown automatically,
+   so they are never gaps. **Status rule changed:** the model's status stands; the backend downgrades
+   only on what it verified itself (unverified figures, invented citations, the tool limit).
+
+| 2 runs × 5 questions | Format on every turn | Draft → structure (buggy) | **Draft → structure (fixed)** |
+|---|---|---|---|
+| Tool calls / question | 2.30 | 2.20 | **1.00** |
+| LLM calls / question | ~3.4 | ~3.4 | **2.0** |
+| Avg latency | 6.3 s | 8.7 s | **5.0 s** |
+| Cost / 5 questions | $0.038 | $0.078 | **$0.042** (warm cache: $0.029) |
+| Same status in both runs | 3/5 | 4/5 | **5/5** |
+
+Prompt injection now declines the false claim *and* gives the real tool-backed total.
+**Eval metrics that came out of this:** tool calls per answer, status consistency across runs.
