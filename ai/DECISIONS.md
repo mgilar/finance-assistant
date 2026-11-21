@@ -111,3 +111,26 @@ small pytest suite.
   numbers or missing columns stop the app at startup, rather than producing a wrong answer later.
 - **Add data-layer tests** whose expected values come from the independent profiling, not from
   the code under test. They are also the seed of the evaluation set.
+
+## 5. API contract, `/summary` and error handling
+
+**I decided:**
+- **Summary shape:** each breakdown row is self-contained: count, native total where it makes
+  sense (per currency; not per vendor status, which mixes currencies) and `eur_approx`. The top
+  level holds the totals and one shared lineage block. "Row EUR figures add up to the total" is
+  a test (within 1 cent per row, because each row is rounded independently).
+- **Error contract, one rule:** the HTTP status says whether the *system* worked; the typed body
+  says what happened. Every response, success or error, has a typed body with a `request_id`.
+  - **"Can't answer" is not an error.** A question the data can't support returns 200 with an honest
+    answer that names the gap. Treating it as an error would show an honest "I can't verify that" as
+    a red failure, and would make monitoring dishonest.
+  - **A failed tool must never become a made-up value.** The failure goes back to the model as a
+    tool result marked `is_error: true`, so it has to say it couldn't compute the number, and the
+    failed call stays in the lineage (§8.2 covers failures too).
+  - **No silent fallback to the stub when the LLM fails.** That returns 503 `llm_unavailable`. The
+    stub runs only when no API key is configured, and it's labelled.
+
+**AI challenged / added:** a three-value status (`answered` / `partial` / `cannot_answer`), so the UI
+can show "can't answer" neutrally; and separate `caveats` (assumptions applied) from `gaps`
+(what can't be verified). Open item for the `/ask` step: a post-answer number check (every
+number in the answer must appear in a tool result).
