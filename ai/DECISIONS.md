@@ -144,3 +144,22 @@ stable IDs: numbered clauses (`3.1`), plus section-level text such as the §3 th
 The prompt tags every unit `[§id]`; those are the only IDs the model may cite, and the backend
 attaches the verbatim text. The policy version (`FIN-POL-014 v3.2`) is part of the lineage, so an
 answer stays traceable to the policy version it used.
+
+## 7. Tool design
+
+**AI proposed:** (A) a few generic tools, (B) many question-specific tools, or (C) generic data tools plus
+a policy-logic tool.
+
+**I decided: C.** `aggregate_spend` and `find_invoices` take filter and group-by fields from fixed lists,
+and `approval_requirement(amount, currency)` handles thresholds.
+- **Why the approval tool:** "who approves EUR 60k?" looks like a policy question but is really a
+  number comparison against the §3 bands. That's arithmetic, which the LLM must not do (GBP 45k is about
+  EUR 52.6k, so a different band from what it looks like). The bands are **read from the parsed §3 table**,
+  not hard-coded, so the policy file stays the single source of truth.
+- **Row cap:** the model sees at most 25 rows plus the total count, to keep tokens and cost down; the
+  evidence panel gets every matching row.
+- **Unknown filter values are errors, not empty results.** Otherwise a filter on "España" would
+  confidently report EUR 0 spent. The error lists the valid values, so the model can retry.
+
+**Spotted in testing:** the #2 vendor by spend (PharmaPrint, about EUR 1.09M) is INACTIVE, so answers
+should surface vendor status (§4.1). That goes into the system prompt.
