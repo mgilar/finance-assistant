@@ -1,6 +1,7 @@
 """HTTP layer only: request ids, error contract, routes. Logic lives in other modules."""
 
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -14,7 +15,7 @@ from dotenv import load_dotenv
 
 from app.ask import answer_question
 from app.data import load_dataset
-from app.llm import LLMUnavailable, llm_configured
+from app.llm import DEFAULT_MODEL, LLMUnavailable, llm_configured
 from app.policy import load_policy
 from app.schemas import AskRequest, AskResponse, ErrorCode, ErrorDetail, ErrorResponse, SummaryResponse
 from app.summary import build_summary
@@ -92,6 +93,15 @@ async def on_unexpected_error(request: Request, exc: Exception):
     return error_response(request, 500, "internal_error",
                           "Unexpected server error. Quote the request id when reporting it.",
                           retryable=True)
+
+
+@app.get("/health")
+def health(request: Request) -> dict:
+    """Liveness + which answering mode is active (the UI shows a STUB banner)."""
+    configured = llm_configured()
+    return {"request_id": _request_id(request), "status": "ok",
+            "mode": "llm" if configured else "stub",
+            "model": os.getenv("ANTHROPIC_MODEL", DEFAULT_MODEL) if configured else None}
 
 
 @app.get("/summary", response_model=SummaryResponse)

@@ -36,6 +36,12 @@ def test_currency_rows_keep_exact_native_totals(client):
     assert rows["EUR"]["eur_approx"] == rows["EUR"]["total_native"]
 
 
+def test_health_reports_stub_mode_without_key(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    body = client.get("/health").json()
+    assert body["status"] == "ok" and body["mode"] == "stub" and body["model"] is None
+
+
 def test_unknown_route_has_typed_error_body(client):
     r = client.get("/nope")
     assert r.status_code == 404

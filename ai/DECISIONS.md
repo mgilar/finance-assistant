@@ -219,3 +219,22 @@ no difference in tool calls, latency or cost, so I kept `medium`.
 **Accepted and documented** (not fixed): the model sometimes repeats an identical query, and the same
 question can flip between `answered` and `partial`. Both become eval metrics (tool calls per answer,
 status consistency across runs).
+
+## 10. Frontend
+
+**I decided:**
+- **Plain React state plus one typed `api.ts`**, rather than a fetching library. Every request returns a typed
+  `Result` (data, or `{code, message, retryable, request_id}`), so components never handle raw exceptions,
+  and the state handling the brief asks about is visible in our own code. The chat is a reducer with
+  explicit turn states: `pending` → `done` | `error` → retry.
+- **Summary on the left, chat on the right**, so the overview stays visible as context.
+- **Evidence inline and collapsible** under each answer: status and source badges, the model's routing
+  reason, unverified figures (highlighted), verbatim policy clauses, each tool call (filters, rows scanned,
+  result table, contributing rows; failed calls in red), gaps (open by default when not fully answered),
+  assumptions, request ID and policy version.
+- **Colour follows meaning:** answered green, partial amber, `cannot_answer` neutral grey. Red only
+  for system errors, which show the request ID and offer Retry only when `retryable`.
+
+**AI added:** a `GET /health` endpoint (mode + model), so the STUB banner shows before the first
+question; strict TypeScript (the scaffold had it off); and a cancellation guard on the summary fetch,
+flagged by the linter.
