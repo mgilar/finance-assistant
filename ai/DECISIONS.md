@@ -192,3 +192,10 @@ is capped at 5 rounds; an LLM failure returns 503 with no fallback to the stub.
 
 **Tests use a scripted fake Claude client**, so the loop, the error paths and the checks are tested
 without an API key.
+
+**My production note on the policy:** in production the policy would come from a versioned, approved
+document system. It would be parsed when a new version is published, not on every request, and the
+units stored with their version. The tagged policy text is static across requests, which also makes it
+a natural candidate for prompt caching. The prototype already parses once at startup, returns
+`policy_version` with every answer, and sends the static system prompt + tools with `cache_control`
+(above Sonnet 5.5's 512-token minimum, with cache reads at 0.05× the input price).
