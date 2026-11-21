@@ -11,5 +11,4 @@ dist/
 .env.local
 .DS_Store
 .claude/settings.local.json
-# Original assignment pack (data/ holds the files we use)
-Assignment/
+

@@ -97,3 +97,17 @@ arrive as CSVs, the database can enforce row-level access control per entity or 
 every parameterised query can be logged verbatim for the §8.2 audit trail. I'd still keep typed tools
 that generate parameterised SQL rather than free text-to-SQL, because they are injection-safe,
 testable and auditable.
+
+## 4. Data layer
+
+**AI proposed:** two ways to handle FX: illustrative fixed rates in code, or a configurable rate file. It also proposed a
+small pytest suite.
+
+**I decided:**
+- **Illustrative 2025 averages as code constants** (1 GBP = 1.17 EUR, 1 USD = 0.89 EUR), with a
+  note attached to every converted figure saying they are not ECB rates. In production we'd
+  use real ECB rates on the invoice date, as policy §5.1 requires.
+- **Load once, validate, fail fast.** Unknown currencies, orphan vendor IDs, duplicate invoice
+  numbers or missing columns stop the app at startup, rather than producing a wrong answer later.
+- **Add data-layer tests** whose expected values come from the independent profiling, not from
+  the code under test. They are also the seed of the evaluation set.
