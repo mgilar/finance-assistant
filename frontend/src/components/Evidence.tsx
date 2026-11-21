@@ -35,6 +35,7 @@ export function DataEvidence({ e }: { e: ToolCallEvidence }) {
         {e.rows_scanned > 0 && ` · ${e.rows_scanned} rows scanned`}</span>
       </div>
       {e.result.length > 0 && <Table rows={e.result} />}
+      <MissingSummary rows={e.rows} />
       {e.rows.length > 0 && (
         <details>
           <summary>{e.rows.length} contributing invoice row{e.rows.length > 1 ? "s" : ""}</summary>
@@ -42,6 +43,21 @@ export function DataEvidence({ e }: { e: ToolCallEvidence }) {
         </details>
       )}
     </div>
+  );
+}
+
+// Policy-relevant gaps, visible without expanding the rows: no PO (§2.2) or no approver (§3.1).
+const POLICY_FIELDS = ["po_number", "approved_by"];
+
+function MissingSummary({ rows }: { rows: Row[] }) {
+  const noPo = rows.filter((r) => r.po_number === null).length;
+  const noApprover = rows.filter((r) => r.approved_by === null).length;
+  if (noPo === 0 && noApprover === 0) return null;
+  return (
+    <p className="missing-summary">
+      Of {rows.length} invoice rows: <strong>{noPo} without a PO</strong> (§2.2) ·{" "}
+      <strong>{noApprover} without an approver</strong> (§3.1)
+    </p>
   );
 }
 
@@ -53,7 +69,11 @@ function Table({ rows, columns, scroll }: { rows: Row[]; columns?: string[]; scr
         <thead><tr>{cols.map((c) => <th key={c}>{c.replaceAll("_", " ")}</th>)}</tr></thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i}>{cols.map((c) => <td key={c} className={r[c] === null ? "missing" : ""}>{cell(r[c])}</td>)}</tr>
+            <tr key={i}>{cols.map((c) => (
+              <td key={c}>
+                {r[c] === null && POLICY_FIELDS.includes(c) ? <span className="missing-badge">MISSING</span> : cell(r[c])}
+              </td>
+            ))}</tr>
           ))}
         </tbody>
       </table>
